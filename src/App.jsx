@@ -90,8 +90,16 @@ function App() {
 
     try {
       setStatus('INITIALIZING MIC...');
+      
+      // Configure ONNX paths globally for the CDN
+      if (window.ort && window.ort.env && window.ort.env.wasm) {
+        window.ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/";
+      }
+
       // Start VAD
       vadRef.current = await window.vad.MicVAD.start({
+        workletURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/vad.worklet.bundle.min.js",
+        modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/silero_vad.onnx",
         onSpeechStart: () => {
           // If JARVIS is currently speaking, stop him so user can interrupt
           if (isSpeakingRef.current) {
@@ -112,6 +120,7 @@ function App() {
       setStatus('AWAITING INPUT...');
     } catch (err) {
       console.error(err);
+      alert("เกิดข้อผิดพลาดในการเปิดไมค์: " + err.message);
       setStatus('MIC ERROR (กรุณาอนุญาตสิทธิ์ไมค์)');
     }
   };
