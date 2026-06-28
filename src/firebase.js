@@ -2,14 +2,14 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 
-// TODO: บอสเอา Firebase Config มาวางทับตรงนี้ได้เลยครับ!
 const firebaseConfig = {
-  apiKey: "PLACEHOLDER_API_KEY",
-  authDomain: "PLACEHOLDER_AUTH_DOMAIN",
-  projectId: "PLACEHOLDER_PROJECT_ID",
-  storageBucket: "PLACEHOLDER_STORAGE_BUCKET",
-  messagingSenderId: "PLACEHOLDER_MESSAGING_SENDER_ID",
-  appId: "PLACEHOLDER_APP_ID"
+  apiKey: "AIzaSyAb-gmKyBvKQEZMVKhbBVLrVUP0MrFraYs",
+  authDomain: "jarvis-mobile-ae1ec.firebaseapp.com",
+  projectId: "jarvis-mobile-ae1ec",
+  storageBucket: "jarvis-mobile-ae1ec.firebasestorage.app",
+  messagingSenderId: "455095494021",
+  appId: "1:455095494021:web:ec8ca78fb88e05632710ec",
+  measurementId: "G-EF72SW53LR"
 };
 
 let app, auth, db, provider;
