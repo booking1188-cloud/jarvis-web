@@ -3,6 +3,54 @@ import { Mic, MicOff, Activity } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import './App.css';
 
+const apiFunctions = {
+  getWeather: async ({ location }) => {
+    try {
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`);
+      const geoData = await geoRes.json();
+      if (!geoData.results || geoData.results.length === 0) return { error: "Location not found" };
+      const { latitude, longitude, name } = geoData.results[0];
+      const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+      const weatherData = await weatherRes.json();
+      return { location: name, current_weather: weatherData.current_weather };
+    } catch (e) { return { error: e.message }; }
+  },
+  getCryptoPrice: async ({ coinId }) => {
+    try {
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId.toLowerCase()}&vs_currencies=usd,thb&include_24hr_change=true`);
+      const data = await res.json();
+      return data;
+    } catch (e) { return { error: e.message }; }
+  }
+};
+
+const geminiTools = [{
+  functionDeclarations: [
+    {
+      name: "getWeather",
+      description: "Get the current weather for a specific city or location.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          location: { type: "STRING", description: "The city name, e.g. Bangkok, London" }
+        },
+        required: ["location"]
+      }
+    },
+    {
+      name: "getCryptoPrice",
+      description: "Get the current price and 24h change of a cryptocurrency.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          coinId: { type: "STRING", description: "The CoinGecko ID of the coin, e.g. bitcoin, ethereum, dogecoin" }
+        },
+        required: ["coinId"]
+      }
+    }
+  ]
+}];
+
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -139,7 +187,8 @@ function App() {
 บทบาท:
 - เป็นผู้ช่วยส่วนตัว ผู้ช่วยทำงาน และผู้ช่วยด้านเทคโนโลยี
 - ตอบโต้ด้วยน้ำเสียงสุภาพ กระชับ และเป็นมืออาชีพ
-- จำบริบทการสนทนาและข้อมูลที่ผู้ใช้อนุญาตให้จดจำ
+- มีความสามารถในการดึงข้อมูลสภาพอากาศและราคาคริปโตเคอร์เรนซีผ่านเครื่องมือ (Tools) ที่มีให้
+- หากผู้ใช้สั่งให้ "วาดรูป" หรือ "สร้างภาพ" ให้ส่งออกเป็น Markdown รูปแบบนี้: ![Image](https://image.pollinations.ai/prompt/{รายละเอียดภาพภาษาอังกฤษแบบละเอียด})
 
 สิ่งที่คุณต้องทำ:
 คุณจะได้รับ "คลิปเสียง" ที่บอสเพิ่งพูดเมื่อกี้ ให้คุณวิเคราะห์ว่าบอสพูดว่าอะไร (จากไฟล์เสียง) และให้คำตอบที่เหมาะสมกลับมาโดยใช้ข้อมูลประวัติการสนทนาด้านล่างนี้ประกอบบริบท
@@ -152,7 +201,7 @@ function App() {
       });
       chatHistory += "บอสพูดว่า: (อ้างอิงจากคลิปเสียงที่แนบไป)\nJ.A.R.V.I.S.: ";
 
-      const response = await aiRef.current.models.generateContent({
+      let response = await aiRef.current.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
           {
@@ -167,8 +216,50 @@ function App() {
               }
             ]
           }
-        ]
+        ],
+        tools: geminiTools
       });
+
+      // Handle function calls if AI decides to use tools
+      if (response.functionCalls && response.functionCalls.length > 0) {
+        setStatus('ANALYZING DATA...');
+        const functionResponses = [];
+        for (const call of response.functionCalls) {
+          const apiFunc = apiFunctions[call.name];
+          if (apiFunc) {
+            const result = await apiFunc(call.args);
+            functionResponses.push({
+              functionResponse: {
+                name: call.name,
+                response: result
+              }
+            });
+          }
+        }
+
+        // Send results back to Gemini
+        response = await aiRef.current.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: chatHistory },
+                { inlineData: { mimeType: mimeType, data: base64Audio } }
+              ]
+            },
+            {
+              role: "model",
+              parts: response.functionCalls.map(c => ({ functionCall: c }))
+            },
+            {
+              role: "user",
+              parts: functionResponses
+            }
+          ],
+          tools: geminiTools
+        });
+      }
 
       const reply = response.text;
       
@@ -253,9 +344,9 @@ function App() {
           {messages.map((msg, index) => (
             <div key={index} className={`message-wrapper ${msg.role}`}>
               <div className="message-label">{msg.role === 'user' ? 'BOSS' : 'J.A.R.V.I.S.'}</div>
-              <div className={`message ${msg.role}`}>
-                {msg.text}
-              </div>
+              <div className={`message ${msg.role}`} dangerouslySetInnerHTML={{
+                __html: msg.text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 10px; margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" />')
+              }} />
             </div>
           ))}
           <div ref={messagesEndRef} />
