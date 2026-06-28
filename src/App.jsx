@@ -54,6 +54,7 @@ function App() {
   const [showApiModal, setShowApiModal] = useState(!localStorage.getItem('gemini_api_key'));
   const [isSystemActive, setIsSystemActive] = useState(false);
   const [status, setStatus] = useState('SYSTEM STANDBY');
+  const [vadProb, setVadProb] = useState(0);
   const [messages, setMessages] = useState([
     { role: 'jarvis', text: 'ระบบออนไลน์เต็มรูปแบบแล้วครับบอส มีงานอะไรให้ผมจัดการ หรือต้องการให้ผมช่วยวิเคราะห์ข้อมูลส่วนไหนเป็นพิเศษไหมครับ?' }
   ]);
@@ -96,10 +97,15 @@ function App() {
         window.ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/";
       }
 
-      // Start VAD
       vadRef.current = await window.vad.MicVAD.new({
         workletURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/vad.worklet.bundle.min.js",
         modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/silero_vad.onnx",
+        positiveSpeechThreshold: 0.5,
+        minSpeechMs: 500,
+        preSpeechPadMs: 300,
+        onFrameProcessed: (probs) => {
+          setVadProb(probs.isSpeech);
+        },
         onSpeechStart: () => {
           // If JARVIS is currently speaking, stop him so user can interrupt
           if (isSpeakingRef.current) {
@@ -238,12 +244,17 @@ function App() {
       const response = await aiRef.current.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
-          chatHistory,
           {
-            inlineData: {
-              mimeType: "audio/wav",
-              data: base64Audio
-            }
+            role: "user",
+            parts: [
+              { text: chatHistory },
+              {
+                inlineData: {
+                  mimeType: "audio/wav",
+                  data: base64Audio
+                }
+              }
+            ]
           }
         ]
       });
@@ -299,6 +310,9 @@ function App() {
       </div>
 
       <div className="status-text">{status}</div>
+      <div style={{textAlign: 'center', color: '#00ffcc', fontSize: '0.9rem', marginTop: '5px'}}>
+        MIC SENSOR: {Math.round(vadProb * 100)}%
+      </div>
       <p style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '10px'}}>
         แตะ 1 ครั้งเพื่อเปิดระบบดักฟัง (Always-On)
       </p>
