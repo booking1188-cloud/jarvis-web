@@ -210,7 +210,7 @@ function App() {
     try {
       // 1. Convert Float32Array from VAD to WAV Base64
       const wavBuffer = encodeWAV(audioFloat32, 16000);
-      const base64Audio = arrayBufferToBase64(wavBuffer);
+      const base64Audio = await arrayBufferToBase64(wavBuffer);
 
       // 2. Build Prompt History
       let chatHistory = `คุณคือ JARVIS ผู้ช่วย AI ส่วนตัวอัจฉริยะของผู้ใช้
@@ -293,9 +293,9 @@ function App() {
 
     } catch (error) {
       console.error("Gemini Error:", error);
-      const errorMsg = "ขออภัยครับบอส ระบบเชื่อมต่อสมองประดิษฐ์ขัดข้อง";
+      const errorMsg = "ขออภัยครับบอส ระบบเชื่อมต่อสมองประดิษฐ์ขัดข้อง: " + (error.message || String(error));
       setMessages(prev => [...prev, { role: 'jarvis', text: errorMsg }]);
-      speak(errorMsg);
+      speak("ขออภัยครับบอส ระบบเชื่อมต่อสมองประดิษฐ์ขัดข้อง");
       setStatus(isSystemActive ? 'AWAITING INPUT...' : 'SYSTEM STANDBY');
     }
   };
