@@ -107,6 +107,14 @@
   border-color: #00ffcc;
 }
 
+.core.active-vad {
+  box-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+  background: radial-gradient(circle, #fff, #b200ff);
+}
+.core.active-vad ~ .ring {
+  border-color: #ff00ff;
+}
+
 .mic-icon {
   color: #050a12;
   width: 24px;
