@@ -97,7 +97,7 @@ function App() {
       }
 
       // Start VAD
-      vadRef.current = await window.vad.MicVAD.start({
+      vadRef.current = await window.vad.MicVAD.new({
         workletURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/vad.worklet.bundle.min.js",
         modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/silero_vad.onnx",
         onSpeechStart: () => {
