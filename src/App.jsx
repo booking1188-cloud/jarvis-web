@@ -135,6 +135,7 @@ function App() {
   };
 
   const toggleSystem = () => {
+    alert("รับทราบคำสั่ง! กำลังพยายามเปิดระบบไมค์...");
     if (isSystemActive) {
       stopVAD();
     } else {
@@ -301,6 +302,16 @@ function App() {
       <p style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '10px'}}>
         แตะ 1 ครั้งเพื่อเปิดระบบดักฟัง (Always-On)
       </p>
+
+      <div style={{ textAlign: 'center', marginTop: '15px' }}>
+        <button 
+          className="btn-primary" 
+          onClick={toggleSystem}
+          style={{ padding: '10px 20px', fontSize: '1rem', borderRadius: '8px' }}
+        >
+          {isSystemActive ? "ปิดไมค์ (STOP)" : "เปิดไมค์ (START)"}
+        </button>
+      </div>
 
       {/* Chat Interface */}
       <div className="chat-interface glass-panel" style={{marginTop: '1rem'}}>
