@@ -67,18 +67,30 @@ function App() {
   const [showApiModal, setShowApiModal] = useState(!localStorage.getItem('gemini_api_key'));
   const [isSystemActive, setIsSystemActive] = useState(false);
   const [status, setStatus] = useState('SYSTEM STANDBY');
-  const [messages, setMessages] = useState([
-    { role: 'jarvis', text: 'ระบบออนไลน์เต็มรูปแบบแล้วครับบอส มีงานอะไรให้ผมจัดการ หรือต้องการให้ผมช่วยวิเคราะห์ข้อมูลส่วนไหนเป็นพิเศษไหมครับ?' }
-  ]);
+  const [attachedImage, setAttachedImage] = useState(null);
+  
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('jarvis_memory');
+    if (saved) return JSON.parse(saved);
+    return [
+      { role: 'jarvis', text: 'ระบบออนไลน์เต็มรูปแบบแล้วครับบอส มีงานอะไรให้ผมจัดการ หรือต้องการให้ผมช่วยวิเคราะห์ข้อมูลส่วนไหนเป็นพิเศษไหมครับ?' }
+    ];
+  });
   
   const messagesEndRef = useRef(null);
   const aiRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const isSpeakingRef = useRef(false);
+  const fileInputRef = useRef(null);
 
   // Auto scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Save to memory whenever messages change
+  useEffect(() => {
+    localStorage.setItem('jarvis_memory', JSON.stringify(messages));
   }, [messages]);
 
   // Initialize Gemini AI
@@ -147,6 +159,25 @@ function App() {
     setIsSystemActive(false);
   };
 
+  const handleCameraCapture = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachedImage(reader.result);
+        setStatus('IMAGE ATTACHED. HOLD MIC TO ASK.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearMemory = () => {
+    if(window.confirm("บอสต้องการลบความจำทั้งหมดของผมใช่ไหมครับ?")) {
+      localStorage.removeItem('jarvis_memory');
+      setMessages([{ role: 'jarvis', text: 'ระบบถูกล้างความจำเรียบร้อยแล้วครับบอส!' }]);
+    }
+  };
+
   const speak = (text) => {
     isSpeakingRef.current = true;
     setStatus('SPEAKING...');
@@ -199,22 +230,37 @@ function App() {
       messages.forEach(msg => {
         chatHistory += `${msg.role === 'user' ? 'บอส' : 'J.A.R.V.I.S.'}: ${msg.text}\n`;
       });
-      chatHistory += "บอสพูดว่า: (อ้างอิงจากคลิปเสียงที่แนบไป)\nJ.A.R.V.I.S.: ";
+      chatHistory += "บอสพูดว่า: (อ้างอิงจากคลิปเสียงที่แนบไป)\n";
+      
+      const userParts = [
+        { text: chatHistory },
+        { inlineData: { mimeType: mimeType, data: base64Audio } }
+      ];
+
+      // Add image to parts if attached
+      let sentImage = null;
+      if (attachedImage) {
+        const [imgMime, imgData] = attachedImage.split(';base64,');
+        const exactMime = imgMime.split(':')[1];
+        userParts.push({
+          inlineData: {
+            mimeType: exactMime,
+            data: imgData
+          }
+        });
+        userParts[0].text += "บอสได้แนบรูปภาพมาให้วิเคราะห์ด้วย (ตามรูปที่แนบมา)\n";
+        sentImage = attachedImage;
+        setAttachedImage(null); // Clear after sending
+      }
+      
+      userParts[0].text += "J.A.R.V.I.S.: ";
 
       let response = await aiRef.current.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
           {
             role: "user",
-            parts: [
-              { text: chatHistory },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Audio
-                }
-              }
-            ]
+            parts: userParts
           }
         ],
         tools: geminiTools
@@ -243,10 +289,7 @@ function App() {
           contents: [
             {
               role: "user",
-              parts: [
-                { text: chatHistory },
-                { inlineData: { mimeType: mimeType, data: base64Audio } }
-              ]
+              parts: userParts
             },
             {
               role: "model",
@@ -265,7 +308,7 @@ function App() {
       
       setMessages(prev => [
         ...prev, 
-        { role: 'user', text: '[Voice Command Recorded]' },
+        { role: 'user', text: sentImage ? '[Voice Command + 📷 Image]' : '[Voice Command Recorded]', image: sentImage },
         { role: 'jarvis', text: reply }
       ]);
       
@@ -315,7 +358,30 @@ function App() {
         แตะวงกลมหรือปุ่มค้างไว้เพื่อพูด ปล่อยนิ้วเมื่อพูดจบ
       </p>
 
-      <div style={{ textAlign: 'center', marginTop: '15px' }}>
+      <div style={{ textAlign: 'center', marginTop: '15px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+        <input 
+          type="file" 
+          accept="image/*" 
+          capture="environment" 
+          ref={fileInputRef} 
+          style={{ display: 'none' }} 
+          onChange={handleCameraCapture}
+        />
+        <button 
+          className="btn-primary" 
+          onClick={() => fileInputRef.current?.click()}
+          style={{ 
+            padding: '15px 20px', 
+            fontSize: '1.2rem', 
+            borderRadius: '50px', 
+            backgroundColor: attachedImage ? '#00ffcc' : 'var(--glass-bg)',
+            color: attachedImage ? '#000' : '#fff',
+            border: 'none',
+            boxShadow: attachedImage ? '0 0 15px #00ffcc' : 'none'
+          }}
+        >
+          📷
+        </button>
         <button 
           className="btn-primary" 
           onPointerDown={startRecording}
@@ -331,7 +397,9 @@ function App() {
             boxShadow: isSystemActive ? '0 0 20px #ff003c' : '0 0 10px var(--primary)',
             userSelect: 'none',
             WebkitUserSelect: 'none',
-            touchAction: 'none'
+            touchAction: 'none',
+            flexGrow: 1,
+            maxWidth: '250px'
           }}
         >
           {isSystemActive ? "กำลังอัดเสียง..." : "🎙️ กดค้างเพื่อพูด"}
@@ -340,13 +408,21 @@ function App() {
 
       {/* Chat Interface */}
       <div className="chat-interface glass-panel" style={{marginTop: '1rem'}}>
+        <div style={{textAlign: 'right', marginBottom: '10px'}}>
+          <button onClick={clearMemory} style={{background: 'transparent', border: '1px solid #ff003c', color: '#ff003c', padding: '5px 10px', borderRadius: '5px', fontSize: '0.8rem', cursor: 'pointer'}}>
+            🗑️ ลบความจำ
+          </button>
+        </div>
         <div className="messages">
           {messages.map((msg, index) => (
             <div key={index} className={`message-wrapper ${msg.role}`}>
               <div className="message-label">{msg.role === 'user' ? 'BOSS' : 'J.A.R.V.I.S.'}</div>
-              <div className={`message ${msg.role}`} dangerouslySetInnerHTML={{
-                __html: msg.text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 10px; margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" />')
-              }} />
+              <div className={`message ${msg.role}`}>
+                {msg.image && <img src={msg.image} style={{maxWidth: '100%', borderRadius: '10px', marginBottom: '10px'}} alt="user upload" />}
+                <div dangerouslySetInnerHTML={{
+                  __html: msg.text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 10px; margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" />')
+                }} />
+              </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
