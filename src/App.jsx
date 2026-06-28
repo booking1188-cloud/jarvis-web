@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Activity } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
+import { auth, provider, signInWithPopup, signOut, db, doc, setDoc, getDoc } from './firebase';
 import './App.css';
 
 const apiFunctions = {
@@ -68,6 +69,7 @@ function App() {
   const [isSystemActive, setIsSystemActive] = useState(false);
   const [status, setStatus] = useState('SYSTEM STANDBY');
   const [attachedImage, setAttachedImage] = useState(null);
+  const [user, setUser] = useState(null);
   
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem('jarvis_memory');
@@ -91,7 +93,31 @@ function App() {
   // Save to memory whenever messages change
   useEffect(() => {
     localStorage.setItem('jarvis_memory', JSON.stringify(messages));
-  }, [messages]);
+    if (user && db) {
+      setDoc(doc(db, 'users', user.uid), { messages }, { merge: true })
+        .catch(err => console.error("Cloud sync error:", err));
+    }
+  }, [messages, user]);
+
+  // Firebase Auth Listener
+  useEffect(() => {
+    if (auth) {
+      const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+        setUser(currentUser);
+        if (currentUser && db) {
+          try {
+            const docSnap = await getDoc(doc(db, 'users', currentUser.uid));
+            if (docSnap.exists() && docSnap.data().messages) {
+              setMessages(docSnap.data().messages);
+            }
+          } catch (e) {
+            console.error("Load cloud memory error:", e);
+          }
+        }
+      });
+      return unsubscribe;
+    }
+  }, []);
 
   // Initialize Gemini AI
   useEffect(() => {
@@ -175,6 +201,29 @@ function App() {
     if(window.confirm("บอสต้องการลบความจำทั้งหมดของผมใช่ไหมครับ?")) {
       localStorage.removeItem('jarvis_memory');
       setMessages([{ role: 'jarvis', text: 'ระบบถูกล้างความจำเรียบร้อยแล้วครับบอส!' }]);
+      if (user && db) {
+        setDoc(doc(db, 'users', user.uid), { messages: [{ role: 'jarvis', text: 'ระบบถูกล้างความจำเรียบร้อยแล้วครับบอส!' }] }, { merge: true });
+      }
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!auth) {
+      alert("บอสต้องตั้งค่า Firebase Config ในไฟล์ src/firebase.js ก่อนเปิดใช้งานระบบคลาวด์ครับ!");
+      return;
+    }
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error(error);
+      alert("Login Failed: " + error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      setUser(null);
     }
   };
 
@@ -434,7 +483,16 @@ function App() {
 
       {/* Chat Interface */}
       <div className="chat-interface glass-panel" style={{marginTop: '1rem'}}>
-        <div style={{textAlign: 'right', marginBottom: '10px'}}>
+        <div style={{textAlign: 'right', marginBottom: '10px', display: 'flex', justifyContent: 'flex-end', gap: '10px'}}>
+          {user ? (
+            <button onClick={handleLogout} style={{background: 'transparent', border: '1px solid #00ffcc', color: '#00ffcc', padding: '5px 10px', borderRadius: '5px', fontSize: '0.8rem', cursor: 'pointer'}}>
+              👤 {user.displayName} (Sign out)
+            </button>
+          ) : (
+            <button onClick={handleLogin} style={{background: 'transparent', border: '1px solid #4285F4', color: '#4285F4', padding: '5px 10px', borderRadius: '5px', fontSize: '0.8rem', cursor: 'pointer'}}>
+              ☁️ Cloud Login
+            </button>
+          )}
           <button onClick={clearMemory} style={{background: 'transparent', border: '1px solid #ff003c', color: '#ff003c', padding: '5px 10px', borderRadius: '5px', fontSize: '0.8rem', cursor: 'pointer'}}>
             🗑️ ลบความจำ
           </button>
