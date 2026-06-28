@@ -1,16 +1,29 @@
-# React + Vite
+# JARVIS Web 🤖
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+JARVIS Web คือผู้ช่วย AI ส่วนตัวที่ถูกพัฒนาขึ้นเพื่อทำงานบนเบราว์เซอร์ โดยผสานพลังของ Gemini AI 2.5 Flash พร้อมกับฟีเจอร์การทำงานขั้นสูง
 
-Currently, two official plugins are available:
+## ✨ ฟีเจอร์ล่าสุด (Milestone 1)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Gemini 2.5 Flash Integration**: ระบบประมวลผลภาษาและวิเคราะห์ข้อมูลที่รวดเร็ว
+- **Multimodal Input**: รองรับการพิมพ์ข้อความ, การสั่งงานด้วยเสียง (Push-to-Talk) และการส่งรูปภาพ/ถ่ายรูปจากกล้อง
+- **Function Calling**: ระบบใช้เครื่องมืออัตโนมัติ (เช่น ดูสภาพอากาศ, เช็คราคาเหรียญ Crypto, สร้างรูปภาพด้วย AI)
+- **Cloud Memory & Authentication (Firebase)**: 
+  - ล็อกอินด้วยบัญชี Google
+  - บันทึกประวัติการสนทนาข้ามอุปกรณ์ผ่านระบบ Cloud Firestore แบบ Real-time
+- **Offline Support (PWA)**: ติดตั้งแอปบนมือถือหรือคอมพิวเตอร์เพื่อใช้งานแบบ Full-screen ได้
 
-## React Compiler
+## 🚀 วิธีการติดตั้งและใช้งานสำหรับนักพัฒนา
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Clone โปรเจกต์นี้
+2. ติดตั้ง Dependencies: `npm install`
+3. ตั้งค่า Firebase:
+   - คัดลอก `firebaseConfig` ของคุณใส่ในไฟล์ `src/firebase.js`
+4. รันระบบ: `npm run dev`
 
-## Expanding the Oxlint configuration
+## ⚙️ โครงสร้างการทำงาน
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- `src/App.jsx`: ศูนย์กลางการจัดการ UI, State, และการเรียกใช้งาน Gemini API
+- `src/firebase.js`: ระบบเชื่อมต่อฐานข้อมูล Firestore และระบบยืนยันตัวตน
+
+---
+*Developed for Book (Vijittamma) - J.A.R.V.I.S Master Plan*
