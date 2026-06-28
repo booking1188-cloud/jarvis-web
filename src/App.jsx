@@ -60,6 +60,7 @@ function App() {
   ]);
   
   const messagesEndRef = useRef(null);
+  const [vadReady, setVadReady] = useState(false);
   const aiRef = useRef(null);
   const vadRef = useRef(null);
   const isSpeakingRef = useRef(false);
@@ -68,6 +69,53 @@ function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Pre-load VAD on mount
+  useEffect(() => {
+    const initVAD = async () => {
+      try {
+        if (!window.ort || !window.vad) return;
+        
+        // Configure ONNX paths globally for the CDN
+        if (window.ort.env && window.ort.env.wasm) {
+          window.ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/";
+        }
+
+        // Initialize VAD but don't start it yet
+        vadRef.current = await window.vad.MicVAD.new({
+          workletURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/vad.worklet.bundle.min.js",
+          modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/silero_vad.onnx",
+          startOnLoad: false,
+          positiveSpeechThreshold: 0.5,
+          minSpeechMs: 500,
+          preSpeechPadMs: 300,
+          onFrameProcessed: (probs) => {
+            setVadProb(probs.isSpeech);
+          },
+          onSpeechStart: () => {
+            if (isSpeakingRef.current) {
+              window.speechSynthesis.cancel();
+              isSpeakingRef.current = false;
+            }
+            setStatus('LISTENING...');
+          },
+          onSpeechEnd: (audioFloat32) => {
+            setStatus('ANALYZING...');
+            handleAudioInput(audioFloat32);
+          },
+          onVADMisfire: () => {
+            setStatus('AWAITING INPUT...');
+          }
+        });
+        setVadReady(true);
+      } catch (err) {
+        console.error("Failed to init VAD", err);
+      }
+    };
+    
+    // Slight delay to ensure CDN scripts are loaded
+    setTimeout(initVAD, 1000);
+  }, []);
 
   // Initialize Gemini AI
   useEffect(() => {
@@ -84,44 +132,14 @@ function App() {
   };
 
   const startVAD = async () => {
-    if (!window.vad) {
-      alert("ระบบตรวจจับเสียง (VAD) ยังโหลดไม่เสร็จ กรุณารอสักครู่");
+    if (!vadReady || !vadRef.current) {
+      alert("ระบบตรวจจับเสียงกำลังเตรียมตัว (Downloading AI Models...) กรุณารอสักครู่ประมาณ 5-10 วินาที แล้วกดใหม่ครับ");
       return;
     }
 
     try {
       setStatus('INITIALIZING MIC...');
-      
-      // Configure ONNX paths globally for the CDN
-      if (window.ort && window.ort.env && window.ort.env.wasm) {
-        window.ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/";
-      }
-
-      vadRef.current = await window.vad.MicVAD.new({
-        workletURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/vad.worklet.bundle.min.js",
-        modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.18/dist/silero_vad.onnx",
-        positiveSpeechThreshold: 0.5,
-        minSpeechMs: 500,
-        preSpeechPadMs: 300,
-        onFrameProcessed: (probs) => {
-          setVadProb(probs.isSpeech);
-        },
-        onSpeechStart: () => {
-          // If JARVIS is currently speaking, stop him so user can interrupt
-          if (isSpeakingRef.current) {
-            window.speechSynthesis.cancel();
-            isSpeakingRef.current = false;
-          }
-          setStatus('LISTENING...');
-        },
-        onSpeechEnd: (audioFloat32) => {
-          setStatus('ANALYZING...');
-          handleAudioInput(audioFloat32);
-        },
-        onVADMisfire: () => {
-          setStatus('AWAITING INPUT...');
-        }
-      });
+      await vadRef.current.start();
       setIsSystemActive(true);
       setStatus('AWAITING INPUT...');
     } catch (err) {
