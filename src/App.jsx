@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Activity } from 'lucide-react';
+import { Mic, Activity } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { auth, provider, signInWithPopup, signOut, db, doc, setDoc, getDoc } from './firebase';
 import './App.css';
