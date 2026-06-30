@@ -50,7 +50,9 @@ const geminiTools = [{
       }
     }
   ]
-}];
+},
+{ googleSearch: {} }
+];
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -68,7 +70,7 @@ function App() {
   const [showApiModal, setShowApiModal] = useState(!localStorage.getItem('gemini_api_key'));
   const [isSystemActive, setIsSystemActive] = useState(false);
   const [status, setStatus] = useState('SYSTEM STANDBY');
-  const [attachedImage, setAttachedImage] = useState(null);
+  const [attachedFile, setAttachedFile] = useState(null);
   const [user, setUser] = useState(null);
   
   const [messages, setMessages] = useState(() => {
@@ -185,16 +187,21 @@ function App() {
     setIsSystemActive(false);
   };
 
-  const handleCameraCapture = (e) => {
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAttachedImage(reader.result);
-        setStatus('IMAGE ATTACHED. HOLD MIC TO ASK.');
+        setAttachedFile({
+          data: reader.result,
+          type: file.type,
+          name: file.name
+        });
+        setStatus('FILE ATTACHED. HOLD MIC TO ASK.');
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = null;
   };
 
   const clearMemory = () => {
@@ -284,7 +291,9 @@ function App() {
 - วิจัยและเปรียบเทียบสินค้า/บริการ
 - วางแผนและจัดการงาน/โปรเจกต์
 - แปลภาษา ไทย ↔ อังกฤษ อย่างแม่นยำ
-- มีความสามารถในการดึงข้อมูลสภาพอากาศและราคาคริปโตเคอร์เรนซีผ่านเครื่องมือ (Tools) ที่มีให้
+- มีความสามารถในการดึงข้อมูลสภาพอากาศและราคาคริปโตเคอร์เรนซีผ่านเครื่องมือที่มีให้
+- คุณมีระบบค้นหาข้อมูลบนอินเทอร์เน็ต (Google Search) หากเรื่องไหนคุณไม่รู้ข้อมูลล่าสุด ให้ใช้เครื่องมือค้นหาทันที
+- คุณสามารถอ่านเอกสาร PDF ที่ผู้ใช้อัปโหลดมาได้
 - หากบอสสั่งให้ "วาดรูป" หรือ "สร้างภาพ" ให้ส่งออกเป็น Markdown รูปแบบนี้: ![Image](https://image.pollinations.ai/prompt/{รายละเอียดภาพภาษาอังกฤษแบบละเอียด})
 
 ## BEHAVIOR RULES
@@ -312,20 +321,21 @@ function App() {
         { inlineData: { mimeType: mimeType, data: base64Audio } }
       ];
 
-      // Add image to parts if attached
-      let sentImage = null;
-      if (attachedImage) {
-        const [imgMime, imgData] = attachedImage.split(';base64,');
-        const exactMime = imgMime.split(':')[1];
+      // Add file to parts if attached
+      let sentFile = null;
+      if (attachedFile) {
+        const [mimePart, dataPart] = attachedFile.data.split(';base64,');
+        const exactMime = mimePart.split(':')[1];
         userParts.push({
           inlineData: {
             mimeType: exactMime,
-            data: imgData
+            data: dataPart
           }
         });
-        userParts[0].text += "บอสได้แนบรูปภาพมาให้วิเคราะห์ด้วย (ตามรูปที่แนบมา)\n";
-        sentImage = attachedImage;
-        setAttachedImage(null); // Clear after sending
+        const isPdf = exactMime === 'application/pdf';
+        userParts[0].text += `\nบอสได้แนบ${isPdf ? 'ไฟล์เอกสาร PDF' : 'รูปภาพ'}มาให้วิเคราะห์ด้วย (ชื่อไฟล์: ${attachedFile.name})\n`;
+        sentFile = attachedFile;
+        setAttachedFile(null); // Clear after sending
       }
       
       userParts[0].text += "J.A.R.V.I.S.: ";
@@ -383,7 +393,11 @@ function App() {
       
       setMessages(prev => [
         ...prev, 
-        { role: 'user', text: sentImage ? '[Voice Command + 📷 Image]' : '[Voice Command Recorded]', image: sentImage },
+        { 
+          role: 'user', 
+          text: sentFile ? (sentFile.type === 'application/pdf' ? '[Voice Command + 📄 PDF]' : '[Voice Command + 📷 Image]') : '[Voice Command Recorded]', 
+          file: sentFile 
+        },
         { role: 'jarvis', text: reply }
       ]);
       
@@ -436,11 +450,10 @@ function App() {
       <div style={{ textAlign: 'center', marginTop: '15px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
         <input 
           type="file" 
-          accept="image/*" 
-          capture="environment" 
+          accept="image/*, application/pdf" 
           ref={fileInputRef} 
           style={{ display: 'none' }} 
-          onChange={handleCameraCapture}
+          onChange={handleFileSelect}
         />
         <button 
           className="btn-primary" 
@@ -449,13 +462,13 @@ function App() {
             padding: '15px 20px', 
             fontSize: '1.2rem', 
             borderRadius: '50px', 
-            backgroundColor: attachedImage ? '#00ffcc' : 'var(--glass-bg)',
-            color: attachedImage ? '#000' : '#fff',
+            backgroundColor: attachedFile ? '#00ffcc' : 'var(--glass-bg)',
+            color: attachedFile ? '#000' : '#fff',
             border: 'none',
-            boxShadow: attachedImage ? '0 0 15px #00ffcc' : 'none'
+            boxShadow: attachedFile ? '0 0 15px #00ffcc' : 'none'
           }}
         >
-          📷
+          📎
         </button>
         <button 
           className="btn-primary" 
@@ -502,7 +515,14 @@ function App() {
             <div key={index} className={`message-wrapper ${msg.role}`}>
               <div className="message-label">{msg.role === 'user' ? 'BOSS' : 'J.A.R.V.I.S.'}</div>
               <div className={`message ${msg.role}`}>
-                {msg.image && <img src={msg.image} style={{maxWidth: '100%', borderRadius: '10px', marginBottom: '10px'}} alt="user upload" />}
+                {msg.file && msg.file.type.startsWith('image/') && (
+                  <img src={msg.file.data} style={{maxWidth: '100%', borderRadius: '10px', marginBottom: '10px'}} alt="user upload" />
+                )}
+                {msg.file && msg.file.type === 'application/pdf' && (
+                  <div style={{background: 'rgba(0,255,204,0.1)', padding: '10px', borderRadius: '5px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(0,255,204,0.3)'}}>
+                    📄 <span style={{fontSize: '0.9rem'}}>{msg.file.name}</span>
+                  </div>
+                )}
                 <div dangerouslySetInnerHTML={{
                   __html: msg.text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 10px; margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" />')
                 }} />
